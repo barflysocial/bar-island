@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: bar-island
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: HOST_PIN
+        value: "1238"
+      - key: NODE_ENV
+        value: production
+      # Add DATABASE_URL in the Render dashboard from your PostgreSQL Internal Database URL.
