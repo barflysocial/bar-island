@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: bar-island
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
