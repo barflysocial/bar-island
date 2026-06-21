@@ -40,7 +40,7 @@ function renderPlayer(){ const root=$('app'); if(!state.session){ root.innerHTML
  else { body=`<div class="card"><h2>${phase}</h2><p>${esc(phaseCue(s))}</p></div>`; }
  root.innerHTML = `<div class="player-bg"><div class="wrap">${status}${body}</div></div>`;
 }
-function homeHtml(){ return `<div class="bg"><div class="wrap home"><img class="title-img" src="/bar-island-title.png"><div class="grid"><button class="btn" onclick="showJoin('player')">Join Player</button><button class="btn teal" onclick="showJoin('audience')">Join Audience Vote</button><button class="btn secondary" onclick="howToPlay()">How to Play</button><button class="btn secondary share-btn" onclick="shareGame()">Share</button></div><div id="sharePanel" class="share-panel"><b>Share Link</b><input readonly id="shareLink" value="${location.origin}"><button class="btn secondary" onclick="copyShareLink()">Copy Link</button></div></div></div>`; }
+function homeHtml(){ return `<div class="bg"><div class="wrap home"><img class="title-img" src="/bar-island-title.png"><div class="grid"><button class="btn" onclick="showJoin('player')">Join Player</button><button class="btn teal" onclick="showJoin('audience')">Join Audience Vote</button><button class="btn secondary" onclick="howToPlay()">How to Play</button><button class="btn secondary share-btn" onclick="shareGame()">Share</button></div></div></div>`; }
 function showJoin(type){ state.mode=type; $('app').innerHTML=`<div class="player-bg"><div class="wrap home"><div class="card"><h2>${type==='player'?'Join Player':'Join Audience Vote'}</h2><label>Session Code</label><input id="joinCode" value="${esc(state.code)}" placeholder="ABC123"><div id="profileArea">${type==='player'?profileFields():''}</div><button class="btn" onclick="join('${type}')">Join</button><button class="btn secondary" onclick="returnHome()">Back</button></div></div></div>`; }
 function profileFields(){ const p=currentPlayer()||{}; const pr=p.profile||{}; return `<label>Name / Nickname *</label><input id="pName" required value="${esc(p.name||'')}" placeholder="Your name"><label>Upload Your Photo *</label><input id="pPhoto" type="file" accept="image/*">${p.photo?`<div class="row saved-photo">${avatar(p)}<span class="muted small">Saved photo will stay unless you upload a new one.</span></div>`:''}<label>My Type *</label><input id="myType" required value="${esc(pr.myType||'')}" placeholder="Funny, confident, good energy"><label>Green Flag *</label><input id="greenFlag" required value="${esc(pr.greenFlag||'')}"><label>Red Flag *</label><input id="redFlag" required value="${esc(pr.redFlag||'')}"><label>Best Pickup Line *</label><input id="pickup" required value="${esc(pr.pickup||'')}"><p class="muted small">* Required before entering the lobby. Photo is required unless host turns it off.</p>`; }
 function profileHtml(){ return `<div class="card"><h2>Create Profile</h2>${profileFields()}<button class="btn" onclick="join('player')">Save Profile</button></div>`; }
@@ -61,7 +61,39 @@ function sessionEndedHtml(){ return `<div class="card"><h2>Session Ended</h2><p 
 function renderAudience(){ const root=$('app'); if(!state.session){ root.innerHTML=homeHtml(); return; } const s=state.session; root.innerHTML=`<div class="player-bg"><div class="wrap"><div class="card light"><div class="split"><div><b>${esc(phaseLabel(s.phase))}</b><div class="muted">Audience Mode</div></div><div class="game-clock">Game ${gameClock(s)}</div></div>${s.phaseEndsAt?`<div class="timer mobile">${fmt(left(s.phaseEndsAt))}</div>`:''}</div>${(s.phase==='audience_vote'||s.phase==='final_winner_vote')?voteHtml('audience'):`<div class="card"><h2>Waiting for Vote</h2><p class="muted">Voting will open soon.</p></div>`}</div></div>`; }
 function returnHome(){ localStorage.removeItem('barIslandCode'); localStorage.removeItem('barIslandPlayerId'); localStorage.removeItem('barIslandAudienceId'); state={session:null,player:null,audience:null,code:'',mode:'home'}; $('app').innerHTML=homeHtml(); }
 function howToPlay(){ alert('Join as a player, create your profile, couple up, answer challenges, survive audience votes, and become Bar Island Champions.'); }
-function shareGame(){ const link=state.code?`${location.origin}/?code=${encodeURIComponent(state.code)}`:location.origin; const panel=$('sharePanel'); if(panel){ panel.classList.add('show'); const inp=$('shareLink'); if(inp) inp.value=link; } if(navigator.share){ navigator.share({title:'Bar Island',text:'Join Bar Island!',url:link}).catch(()=>{}); } }
-async function copyShareLink(){ const link=$('shareLink')?.value||location.origin; try{ await navigator.clipboard.writeText(link); alert('Share link copied.'); }catch(e){ prompt('Copy this link:', link); } }
+function currentShareLink(){
+  const urlCode=new URLSearchParams(location.search).get('code');
+  const code=(state.code||urlCode||localStorage.barIslandCode||'').trim().toUpperCase();
+  return code ? `${location.origin}/?code=${encodeURIComponent(code)}` : location.origin;
+}
+function qrImageUrl(link, size=260){
+  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=10&data=${encodeURIComponent(link)}`;
+}
+function shareGame(){
+  closeShareModal();
+  const link=currentShareLink();
+  const modal=document.createElement('div');
+  modal.id='shareModal';
+  modal.className='share-modal';
+  modal.innerHTML=`<div class="share-modal-backdrop" onclick="closeShareModal()"></div>
+    <div class="share-modal-card" role="dialog" aria-modal="true" aria-label="Share Bar Island">
+      <button class="share-close" onclick="closeShareModal()" aria-label="Close share panel">×</button>
+      <h2>Share Bar Island</h2>
+      <p class="muted">Scan the QR code or copy the join link.</p>
+      <img class="share-qr" src="${qrImageUrl(link)}" alt="QR code for Bar Island join link">
+      <input readonly id="shareLink" value="${esc(link)}" onclick="this.select()">
+      <button class="btn" onclick="copyShareLink()">Copy Link</button>
+    </div>`;
+  document.body.appendChild(modal);
+}
+function closeShareModal(){ const m=$('shareModal'); if(m) m.remove(); }
+async function copyShareLink(){
+  const link=$('shareLink')?.value||currentShareLink();
+  try{ await navigator.clipboard.writeText(link); }
+  catch(e){ prompt('Copy this link:', link); }
+  const btn=document.querySelector('#shareModal .btn');
+  if(btn) btn.textContent='Copied ✓';
+  setTimeout(closeShareModal,700);
+}
 async function tickPlayer(){ try{ if(state.code){ await loadSession(); if(state.mode==='audience') renderAudience(); else renderPlayer(); } }catch(e){ if(state.code){ $('app').innerHTML=`<div class="player-bg"><div class="wrap">${sessionEndedHtml()}</div></div>`; } } }
 if(location.pathname==='/'||location.pathname==='/player'){ const urlCode=new URLSearchParams(location.search).get('code'); if(urlCode){ state.code=urlCode.toUpperCase(); localStorage.barIslandCode=state.code; } $('app').innerHTML=homeHtml(); /* Do not auto-advance from the title screen. Resume only after Join Player is tapped. */ setInterval(()=>{ if(state.mode==='player' || state.mode==='audience') tickPlayer(); },3000); }
